@@ -1,0 +1,20 @@
+{
+  "name": "tccspiel",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "homepage": "https://dawid-kotowski.github.io/",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "deploy": "gh-pages -d dist"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.49.8"
+  }
+  
+}
