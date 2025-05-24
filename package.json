@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://dawid-kotowski.github.io/",
+  "homepage": "https://dawid-kotowski.github.io",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
@@ -11,10 +11,10 @@
     "deploy": "gh-pages -d dist"
   },
   "devDependencies": {
+    "gh-pages": "^6.3.0",
     "vite": "^6.3.5"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.49.8"
   }
-  
 }

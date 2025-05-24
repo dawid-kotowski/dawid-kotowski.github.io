@@ -1,13 +1,20 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <title>Login</title>
+  <script type="module" src="/src/main.js"></script>
+</head>
+<body>
+  <h1>Login / Registrierung</h1>
+  <input type="text" id="username" placeholder="Benutzername">
+  <input type="password" id="password" placeholder="Passwort">
+  <button id="register-btn">Einloggen / Registrieren</button>
+
+  <h2>Registrierte Nutzer</h2>
+  <table id="usertable" border="1">
+    <thead><tr><th>Benutzername</th><th>Erstellt am</th></tr></thead>
+    <tbody></tbody>
+  </table>
+</body>
 </html>
