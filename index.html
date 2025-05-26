@@ -3,18 +3,32 @@
 <head>
   <meta charset="UTF-8">
   <title>Login</title>
+  <link rel="icon" type="image/x-icon" href="/public/favicon.ico" />
   <script type="module" src="/src/main.js"></script>
 </head>
 <body>
-  <h1>Login / Registrierung</h1>
-  <input type="text" id="username" placeholder="Benutzername">
-  <input type="password" id="password" placeholder="Passwort">
-  <button id="register-btn">Einloggen / Registrieren</button>
+  <div class="login-section">
+    <h1>Login / Registrierung</h1>
+    <div class="login-form">
+      <input type="text" id="email" placeholder="E-Mail">
+      <input type="text" id="username" placeholder="Benutzername">
+      <input type="password" id="password" placeholder="Passwort">
+      <button id="register-btn">Einloggen / Registrieren</button>
+    </div>
+  </div>
+  <div id="status">Nicht angemeldet</div>
 
-  <h2>Registrierte Nutzer</h2>
-  <table id="usertable" border="1">
-    <thead><tr><th>Benutzername</th><th>Erstellt am</th></tr></thead>
-    <tbody></tbody>
-  </table>
+  <div class="usertable-section">
+    <h2>Registrierte Nutzer</h2>
+    <table id="usertable">
+      <thead>
+        <tr>
+          <th>Benutzername</th>
+          <th>Erstellt am</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
 </body>
 </html>
