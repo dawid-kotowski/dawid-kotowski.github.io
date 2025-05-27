@@ -19,11 +19,13 @@ async function register() {
 
   const { data, error } = await supabase.auth.signUp({ email, password });
   if (error) {
-    alert("Registrierungsfehler: " + error) 
+    console.error("Registrierungsfehler: " + error.message) 
+    alert("Registrierungsfehler: " + error.message)
   } else if(!data?.user) {
     alert("Registrierung fehlgeschlagen: Passwort zu schwach oder Netzwerkfehler");
     return;
   } else {
+    console.log("Registrierung in Auth erfolreich!")
     await insertUserIntoDatabase(data.user.id, username);
     await updateLoginStatus();  
     alert("Registrierung erfolgreich!");
