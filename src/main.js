@@ -1,64 +1,83 @@
 import './style.css'
 import { createClient } from '@supabase/supabase-js'
-// === Supabase-Konfiguration ===
+
 const SUPABASE_URL = "https://gwusxowacqvutyrqxqgq.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dXN4b3dhY3F2dXR5cnF4cWdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMDQ0NDIsImV4cCI6MjA2MzU4MDQ0Mn0.a3TKGAcxTXKHS8VCKLPwSm2z0HSymzlGgmiKkZPJDj4";
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-
 // === Registrierung ===
 async function register() {
-  const entered_email = document.getElementById("email").value;
-  const entered_username = document.getElementById("username").value;
-  const entered_password = document.getElementById("password").value;
+  const email = document.getElementById("regEmail").value;
+  const username = document.getElementById("regUsername").value;
+  const password = document.getElementById("regPassword").value;
 
-  if (!entered_username || !entered_password || !entered_email) {
+  if (!username || !password || !email) {
     alert("Bitte alle Felder ausfüllen!");
     return;
   }
+  console.log("Registrierungs-Funktion aufgerufen mit", email, username, password);
 
-  // Step 1: Sign up with Supabase Auth
-  const { data: authData, error: authError } = await supabase.auth.signUp({
-    email: entered_email,
-    password: entered_password
-  });
+  const { data, error } = await supabase.auth.signUp({ email, password });
+  if (error) {
+    alert("Registrierungsfehler: " + error) 
+  } else if(!data?.user) {
+    alert("Registrierung fehlgeschlagen: Passwort zu schwach oder Netzwerkfehler");
+    return;
+  } else {
+    await insertUserIntoDatabase(data.user.id, username);
+    await updateLoginStatus();  
+    alert("Registrierung erfolgreich!");
+  }
+  await loadUsers();
+}
 
-  if (authError) {
-    console.error("Registrierungsfehler:", authError);
-    alert("Fehler bei der Registrierung: " + authError.message);
+// === Login ===
+async function login() {
+  const email = document.getElementById("loginEmail").value;
+  const password = document.getElementById("loginPassword").value;
+
+  if (!password || !email) {
+    alert("Bitte alle Felder ausfüllen!");
     return;
   }
+  console.log("Login-Funktion aufgerufen mit", email, password);
 
-  const userId = authData?.user?.id;
-  if (!userId) {
-    console.error("Kein Benutzer nach Registrierung vorhanden.");
-    alert("Unbekannter Fehler nach Registrierung.");
-    return;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
+    alert("Loginfehler: " + error)
   }
+  await updateLoginStatus();
+  alert("Login erfolgreich!")
 
-  // Step 2: Add entry in the 'users' table
+  document.getElementById('loginTab')?.classList.remove('active');
+  document.getElementById('loginForm')?.classList.remove('active');
+  const loginSection = document.querySelector(".login-section");
+  if (loginSection) loginSection.remove();
+
+  await loadUsers();
+}
+
+// === Nutzer in Datenbank laden ===
+async function insertUserIntoDatabase(userId, username) {
   const { error: dbError } = await supabase.from("users").insert([
-    {
-      id: userId,         // this links to auth.users
-      username: entered_username
-    }
+    { id: userId, username }
   ]);
 
   if (dbError) {
     console.error("Fehler beim Schreiben in users-Tabelle:", dbError);
     alert("Registrierung fehlgeschlagen: Userdaten konnten nicht gespeichert werden.");
-    return;
+  } else {
+    console.log("User in Datenbank eingetragen!")
+    document.getElementById('loginTab')?.classList.remove('active');
+    document.getElementById('loginForm')?.classList.remove('active');
+    const loginSection = document.querySelector(".login-section");
+    if (loginSection) loginSection.remove();
   }
-
-  alert("Erfolgreich registriert!");
-  updateLoginStatus();
-  loadUsers();
 }
 
 // === Nutzer laden ===
 async function loadUsers() {
   const { data, error } = await supabase.from("users").select("username, created_at");
-
   if (error) {
     console.error("Fehler beim Laden:", error);
     return;
@@ -78,30 +97,77 @@ async function updateLoginStatus() {
   const { data: { session } } = await supabase.auth.getSession();
   const statusElement = document.getElementById("status");
 
-  if (session && session.user) {
+  if (session?.user) {
     const userId = session.user.id;
 
-    const { data, error } = await supabase
+    const { data: userData, error } = await supabase
       .from("users")
       .select("username")
       .eq("id", userId)
       .single();
 
-    if (error) {
-      console.error("Fehler beim Abrufen des Benutzernamens:", error);
-      statusElement.textContent = "Angemeldet";
-      return;
+    if (userData) {
+      statusElement.textContent = `Angemeldet als ${userData.username}`;
     }
-
-    statusElement.textContent = `Angemeldet als ${data.username}`;
   } else {
     statusElement.textContent = "Nicht angemeldet";
   }
 }
 
-// === Initialisierung ===
-document.addEventListener("DOMContentLoaded", () => {
+// === Tabs initialisieren ===
+function initializeTabs() {
+  const loginTab = document.getElementById('loginTab');
+  const registerTab = document.getElementById('registerTab');
+  const loginForm = document.getElementById('loginForm');
+  const registerForm = document.getElementById('registerForm');
+
+  loginTab.addEventListener('click', () => {
+    loginTab.classList.add('active');
+    registerTab.classList.remove('active');
+    loginForm.classList.add('active');
+    registerForm.classList.remove('active');
+  });
+
+  registerTab.addEventListener('click', () => {
+    registerTab.classList.add('active');
+    loginTab.classList.remove('active');
+    registerForm.classList.add('active');
+    loginForm.classList.remove('active');
+  });
+
+  // Standardmäßig Login anzeigen
+  loginTab.classList.add('active');
+  registerTab.classList.remove('active');
+  loginForm.classList.add('active');
+  registerForm.classList.remove('active');
+}
+
+// === Seite initialisieren ===
+document.addEventListener("DOMContentLoaded", async () => {
+
+  initializeTabs();
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    document.getElementById('loginTab')?.classList.remove('active');
+    document.getElementById('loginForm')?.classList.remove('active');
+    const loginSection = document.querySelector(".login-section");
+    if (loginSection) loginSection.remove();
+  }
+
   document.getElementById("register-btn").addEventListener("click", register);
-  updateLoginStatus();
-  loadUsers();
+  document.getElementById("login-btn").addEventListener("click", login);
+
+  document.getElementById("logout-btn").addEventListener("click", async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Fehler beim Ausloggen:", error);
+      alert("Fehler beim Ausloggen.");
+    } else {
+      alert("Erfolgreich ausgeloggt.");
+      location.reload();
+    }
+  });
+
+  await updateLoginStatus();
+  await loadUsers();
 });

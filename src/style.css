@@ -35,16 +35,44 @@ body {
   gap: 2rem;
 }
 
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  margin-top: 0.3rem;
+.logout-section {
+  display: block;
+  position: relative;
+  color: crimson;
 }
 
-.login-form input {
-  padding: 0.5rem;
-  width: 200px;
+.tab-container {
+  display: flex;
+  margin-bottom: 1rem;
+}
+
+.tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid #ccc;
+  cursor: pointer;
+}
+
+.tab.active {
+  background-color: #007BFF;
+  color: white;
+}
+
+.form-container {
+  display: none;
+}
+
+.form-container.active {
+  display: block;
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  max-width: 300px;
+}
+
+label, input {
+  margin: 0.5rem 0;
 }
 
 #register-btn {
