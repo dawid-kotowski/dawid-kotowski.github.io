@@ -60,7 +60,7 @@ async function login() {
 // === Nutzer in Datenbank laden ===
 async function insertUserIntoDatabase(userId, username) {
   const { error: dbError } = await supabase.from("users").insert([
-    { id: userId, username }
+    { id: userId, username: username }
   ]);
 
   if (dbError) {
@@ -144,20 +144,11 @@ function initializeTabs() {
 
 // === Seite initialisieren ===
 document.addEventListener("DOMContentLoaded", async () => {
-
   initializeTabs();
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session?.user) {
-    document.getElementById('loginTab')?.classList.remove('active');
-    document.getElementById('loginForm')?.classList.remove('active');
-    const loginSection = document.querySelector(".login-section");
-    if (loginSection) loginSection.remove();
-  }
 
-  document.getElementById("register-btn").addEventListener("click", register);
-  document.getElementById("login-btn").addEventListener("click", login);
-
-  document.getElementById("logout-btn").addEventListener("click", async () => {
+  document.getElementById("register-btn")?.addEventListener("click", register);
+  document.getElementById("login-btn")?.addEventListener("click", login);
+  document.getElementById("logout-btn")?.addEventListener("click", async () => {
     const { error } = await supabase.auth.signOut();
     if (error) {
       console.error("Fehler beim Ausloggen:", error);

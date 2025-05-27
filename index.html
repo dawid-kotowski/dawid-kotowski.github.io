@@ -12,7 +12,7 @@
   </div>
   <div class="tab-container">
     <div class="tab active" id="loginTab">Login</div>
-    <div class="tab" id="registerTag">Registrierung</div>
+    <div class="tab" id="registerTab">Registrierung</div>
   </div>
 
   <div class="login-section">
@@ -28,12 +28,12 @@
 
     <div id="registerForm" class="form-container">
       <form>
-        <label for="regEmail">Email:</label>
+        <label for="regUsername">Benutzername:</label>
+        <input type="username" id="regUsername" required>
+        <label for="regEmail">E-Mail:</label>
         <input type="email" id="regEmail" required>
-        <label for="regPassword">Passwort:</label>
+        <label for="regPassword">Passwort(mindestens 6 Zeichen):</label>
         <input type="password" id="regPassword" required>
-        <label for="regConfirm">Passwort bestätigen:</label>
-        <input type="password" id="regConfirm" required>
         <button type="submit" id="register-btn">Registrieren</button>
       </form>
     </div>
