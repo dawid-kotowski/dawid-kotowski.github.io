@@ -140,6 +140,14 @@ p {
   color: #888;
 }
 
+.hidden {
+  display: none;
+  background-color: darkolivegreen;
+  width: fit-content;
+  margin-top: auto;
+  margin-bottom: auto;
+}
+
 
 @media (prefers-color-scheme: light) {
   :root {

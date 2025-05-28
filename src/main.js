@@ -60,7 +60,7 @@ async function login() {
 // === Nutzer in Datenbank laden ===
 async function insertUserIntoDatabase(userId, username) {
   const { error: dbError } = await supabase.from("users").insert([
-    { id: userId, username: username }
+    { id: userId, username: username, points: 0, role: 'user' }
   ]);
 
   if (dbError) {
@@ -102,13 +102,19 @@ async function updateLoginStatus() {
 
     const { data: userData, error } = await supabase
       .from("users")
-      .select("username")
+      .select("username, role")
       .eq("id", userId)
       .single();
 
     if (userData) {
-      statusElement.textContent = `Angemeldet als ${userData.username}`;
+      statusElement.textContent = `Angemeldet als ${userData.username} (${userData.role})`;
     }
+
+    if (userData.role === "admin") {
+      // Hier Admin Scheiß reinmachen
+      document.getElementById("adminPanel")?.classList.remove("hidden");
+    }
+
   } else {
     statusElement.textContent = "Nicht angemeldet";
   }
