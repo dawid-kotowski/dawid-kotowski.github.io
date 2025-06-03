@@ -177,12 +177,23 @@ async function start_game() {
   let startTime = Date.now();
   const interval = setInterval(async () => {
     const now = Date.now();
-    if (now - startTime > 30 * 60 * 1000 || startTime < 60000) {
+    if (now - startTime > 1 * 60 * 1000) {
       clearInterval(interval);
       return;
     }
-    const response = await supabase.functions.invoke("start_game");
-    console.log(response.data)
+    const { data: { session } } = await supabase.auth.getSession();
+    console.log("Nutze hier Access-Token: ", session.access_token);
+    const { error:edgeError, data:response } = await supabase.functions.invoke("start_game", {
+      method: "POST",
+      headers: {
+        // zwingend das aktuelle Access-Token des eingeloggten Nutzers
+        "Authorization": `Bearer ${session.access_token}`,
+      },
+    });
+    if (edgeError) {
+      console.error("Fehler in der EdgeFunction: ", edgeError)
+    }
+    console.log(response.data);
   }, 5000); // alle 5s
 }
 
@@ -235,19 +246,7 @@ function subscribeToGames() {
           return;
         }
 
-        // Nur einmalig ins Game-View wechseln, wenn User aktuell noch in_queue steht
-        const { data: userStatusRecord, error: statusErr } = await supabase
-          .from("users")
-          .select("status")
-          .eq("id", currentUserId)
-          .single();
-
-        if (statusErr) {
-          console.error("Fehler beim Auslesen des Nutzerstatus:", statusErr);
-          return;
-        }
-
-        if (userStatusRecord.status !== "in_queue" || hasEnteredGameView) {
+        if (hasEnteredGameView) {
           return;
         }
 
@@ -275,10 +274,7 @@ function subscribeToGames() {
         hasEnteredGameView = true;
 
         // Status des aktuellen Users auf "paired" setzen
-        const { error: updateErr } = await supabase
-          .from("users")
-          .update({ status: "paired" })
-          .eq("id", currentUserId);
+        
 
         if (updateErr) {
           console.error("Fehler beim Updaten des Nutzerstatus:", updateErr);
