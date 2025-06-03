@@ -177,32 +177,21 @@ async function start_game() {
   let startTime = Date.now();
   const interval = setInterval(async () => {
     const now = Date.now();
-    if (now - startTime > 1 * 60 * 1000) {
+    if (now - startTime > 4 * 15 * 1000) {
       clearInterval(interval);
       return;
     }
     const { data: { session } } = await supabase.auth.getSession();
     console.log("Nutze hier Access-Token: ", session.access_token);
-    const { error:edgeError, data:response } = await supabase.functions.invoke("start_game", {
+    const response = await supabase.functions.invoke("start_game", {
       method: "POST",
       headers: {
         // zwingend das aktuelle Access-Token des eingeloggten Nutzers
         "Authorization": `Bearer ${session.access_token}`,
       },
     });
-    if (edgeError) {
-      console.error("Fehler in der EdgeFunction: ", edgeError)
-    }
     console.log(response.data);
-  }, 5000); // alle 5s
-}
-
-// === GameView für User ===
-function showGameView(player1Name, player2Name) {
-  lobbyEl.classList.add("hidden");
-  player1Btn.textContent = player1Name;
-  player2Btn.textContent = player2Name;
-  gameViewEl.classList.add("visible");
+  }, 30000); // alle 30s
 }
 
 // === RealTime API für neue/aktualisierte Einträge in "games" ===
@@ -213,6 +202,14 @@ function subscribeToGames() {
 
   // Flags, damit showGameView() nur einmal pro Spiel-Session aufgerufen wird
   let hasEnteredGameView = false;
+
+  // Hilfsfunktion zum Einblenden der Game-View
+  function showGameView(player1Name, player2Name) {
+    lobbyEl.classList.add("hidden");
+    player1Btn.textContent = player1Name;
+    player2Btn.textContent = player2Name;
+    gameViewEl.classList.add("visible");
+  }
 
   // Hilfsfunktion zum Aufräumen (Game-View ausblenden, Listener entfernen)
   function deleteGameView() {
