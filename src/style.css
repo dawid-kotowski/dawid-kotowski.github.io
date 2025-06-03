@@ -1,3 +1,4 @@
+/* === Global Styles === */
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -5,7 +6,7 @@
 
   color-scheme: light dark;
   color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  background-color: #1e1e1e;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
@@ -13,43 +14,82 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+  font-family: sans-serif;
+  background-color: #1e1e1e;
+  color: #ffffff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+h1, h2, p {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+/* === Links === */
 a {
   font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
+  color: #84b9ff;
+  text-decoration: none;
 }
 a:hover {
-  color: #535bf2;
+  color: #66a3ff;
 }
 
-body {
-  margin: 2rem;
-  font-family: sans-serif;
-  background-color: #2e2929;
-}
-
-.login-section {
+/* === Forms === */
+form {
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 2rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 90vw;
+  margin: 0 auto;
 }
 
-.logout-section {
-  display: block;
-  position: relative;
-  color: crimson;
+label, input {
+  font-size: 1rem;
 }
 
+input {
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+button {
+  padding: 0.75rem;
+  background-color: #007ACC;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background-color 0.2s ease;
+}
+
+button:hover {
+  background-color: #005999;
+}
+
+/* === Tabs === */
 .tab-container {
   display: flex;
-  margin-bottom: 1rem;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
 }
 
 .tab {
   padding: 0.5rem 1rem;
-  border: 1px solid #ccc;
+  border: 1px solid #555;
   cursor: pointer;
+  border-radius: 4px;
+  background-color: #2e2e2e;
+  color: white;
 }
 
 .tab.active {
@@ -65,99 +105,122 @@ body {
   display: block;
 }
 
-form {
+/* === Lobby & Game View Containers === */
+#app {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+#lobby, #gameView {
+  width: 100%;
+  max-width: 600px;
+  padding: 2rem;
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  max-width: 300px;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.3s ease;
 }
 
-label, input {
-  margin: 0.5rem 0;
+#gameView {
+  background-color: #f5f5f5;
+  color: #1e1e1e;
+  display: none;
 }
 
-#register-btn {
-  margin-top: 0.5rem;
-  padding: 0.5rem;
-  width: fit-content;
+#gameView.visible {
+  display: flex;
+  opacity: 1;
 }
 
-.usertable-section {
-  margin-top: 3rem;
+#lobby.hidden {
+  opacity: 0;
+  pointer-events: none;
 }
 
-table {
-  border-collapse: collapse;
+/* === Buttons === */
+.player-buttons {
+  display: flex;
+  gap: 1rem;
   width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 2rem;
 }
 
-table th, table td {
-  border: 1px solid #211c5c;
-  padding: 0.5rem;
+.player-buttons button {
+  flex: 1 1 45%;
+  padding: 2rem 1rem;
+  font-size: 1.5rem;
+  border-radius: 1rem;
+}
+
+/* === Tables === */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 2rem;
+}
+
+th, td {
+  padding: 0.75rem;
   text-align: left;
+  border-bottom: 1px solid #555;
 }
 
-h1 {
-  font-size: 1.4em;
-  line-height: 1.1;
-  line-break: strict;
+/* === Responsive Design === */
+@media (max-width: 600px) {
+  .player-buttons {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  form {
+    max-width: 100%;
+  }
 }
 
-h2 {
-  font-size: 1.2em;
-  line-height: 1.1;
-  line-break: strict;
-}
-p {
-  margin-top: 2em;
-  margin-bottom: 2em;
+/* === Admin & Status === */
+.logout-section {
+  align-self: flex-end;
+  margin-bottom: 1rem;
 }
 
-#app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+#adminPanel {
+  margin-top: 2rem;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #f7df1eaa);
-}
-
-.card {
-  padding: 2em;
-}
-
-.read-the-docs {
-  color: #888;
+#status {
+  margin-top: 1rem;
+  font-style: italic;
 }
 
 .hidden {
-  display: none;
-  background-color: darkolivegreen;
-  width: fit-content;
-  margin-top: auto;
-  margin-bottom: auto;
+  display: none !important;
 }
 
-
+/* === Light Mode === */
 @media (prefers-color-scheme: light) {
   :root {
     color: #213547;
     background-color: #ffffff;
   }
-  a:hover {
-    color: #747bff;
+
+  #gameView {
+    background-color: #ffffff;
+    color: #213547;
   }
-  button {
-    background-color: #f9f9f9;
+
+  .tab {
+    border-color: #ccc;
+  }
+
+  input {
+    border-color: #ccc;
   }
 }

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient("https://gwusxowacqvutyrqxqgq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dXN4b3dhY3F2dXR5cnF4cWdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMDQ0NDIsImV4cCI6MjA2MzU4MDQ0Mn0.a3TKGAcxTXKHS8VCKLPwSm2z0HSymzlGgmiKkZPJDj4");
 
+//#region Authentification
 // === Registrierung ===
 async function register() {
   const email = document.getElementById("regEmail").value;
@@ -53,12 +54,30 @@ async function login() {
   document.getElementById('loginForm')?.classList.remove('active');
   const loginSection = document.querySelector(".login-section");
   if (loginSection) loginSection.remove();
+  const tabSection = document.querySelector(".tab-container")
+  if (tabSection) tabSection.remove();
 
   await loadUsers();
 }
 
+// === Session bekommen ===
+async function getUserId() {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session?.user) {
+    return session.user.id;
+  } else {
+    console.log("Kein User in der Session")
+    return null;
+  }
+}
+
 // === Nutzer in Datenbank laden ===
 async function insertUserIntoDatabase(userId, username) {
+  const { data, error } = await supabase.from("users").select("id").eq("username", username).single();
+  if (data) {
+    alert("Username bereits vergeben.");
+    return;
+  }
   const { error: dbError } = await supabase.from("users").insert([
     { id: userId, username: username, points: 0, role: 'user' }
   ]);
@@ -72,6 +91,8 @@ async function insertUserIntoDatabase(userId, username) {
     document.getElementById('loginForm')?.classList.remove('active');
     const loginSection = document.querySelector(".login-section");
     if (loginSection) loginSection.remove();
+    const tabSection = document.querySelector(".tab-container")
+    if (tabSection) tabSection.remove();
   }
 }
 
@@ -147,10 +168,217 @@ function initializeTabs() {
   loginForm.classList.add('active');
   registerForm.classList.remove('active');
 }
+//#endregion
+
+
+//#region Spiellogik
+// === Spiel Start Einstellungen ===
+async function start_game() {
+  let startTime = Date.now();
+  const interval = setInterval(async () => {
+    const now = Date.now();
+    if (now - startTime > 30 * 60 * 1000 || startTime < 60000) {
+      clearInterval(interval);
+      return;
+    }
+    const response = await supabase.functions.invoke("start_game");
+    console.log(response.data)
+  }, 5000); // alle 5s
+}
+
+// === GameView für User ===
+function showGameView(player1Name, player2Name) {
+  lobbyEl.classList.add("hidden");
+  player1Btn.textContent = player1Name;
+  player2Btn.textContent = player2Name;
+  gameViewEl.classList.add("visible");
+}
+
+// === RealTime API für neue/aktualisierte Einträge in "games" ===
+function subscribeToGames() {
+  // Referenzen auf die Buttons, die nur einmal belegt werden sollen
+  const player1Btn = document.getElementById("player1Btn");
+  const player2Btn = document.getElementById("player2Btn");
+
+  // Flags, damit showGameView() nur einmal pro Spiel-Session aufgerufen wird
+  let hasEnteredGameView = false;
+
+  // Hilfsfunktion zum Aufräumen (Game-View ausblenden, Listener entfernen)
+  function deleteGameView() {
+    document.getElementById("gameView")?.classList.remove("visible");
+    document.getElementById("lobby")?.classList.remove("hidden");
+    player1Btn.replaceWith(player1Btn.cloneNode(true));
+    player2Btn.replaceWith(player2Btn.cloneNode(true));
+    hasEnteredGameView = false;
+  }
+
+  // Haupt-Subscription
+  supabase
+    .channel("realtime:games")
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "games" },
+      async (payload) => {
+        if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") {
+          return;
+        }
+
+        const game = payload.new;
+        if (!game) return;
+
+        // Aktuelle User-ID ermitteln
+        const currentUserId = await getUserId();
+        if (!currentUserId) return;
+
+        // Falls der aktuelle User nicht zu diesem Spiel gehört, abbrechen
+        if (game.player1 !== currentUserId && game.player2 !== currentUserId) {
+          return;
+        }
+
+        // Nur einmalig ins Game-View wechseln, wenn User aktuell noch in_queue steht
+        const { data: userStatusRecord, error: statusErr } = await supabase
+          .from("users")
+          .select("status")
+          .eq("id", currentUserId)
+          .single();
+
+        if (statusErr) {
+          console.error("Fehler beim Auslesen des Nutzerstatus:", statusErr);
+          return;
+        }
+
+        if (userStatusRecord.status !== "in_queue" || hasEnteredGameView) {
+          return;
+        }
+
+        // Spieler-Namen aus der users-Tabelle laden
+        const p1 = game.player1;
+        const p2 = game.player2;
+        const { data: users, error: userErr } = await supabase
+          .from("users")
+          .select("id, username")
+          .in("id", [p1, p2]);
+
+        if (userErr || !users) {
+          console.error("Fehler beim Laden der Spielernamen:", userErr);
+          return;
+        }
+
+        // In eine Map packen, um schnellen Zugriff per ID zu haben
+        const userMap = {};
+        users.forEach((u) => {
+          userMap[u.id] = u.username;
+        });
+
+        // Game-View anzeigen
+        showGameView(userMap[p1], userMap[p2]);
+        hasEnteredGameView = true;
+
+        // Status des aktuellen Users auf "paired" setzen
+        const { error: updateErr } = await supabase
+          .from("users")
+          .update({ status: "paired" })
+          .eq("id", currentUserId);
+
+        if (updateErr) {
+          console.error("Fehler beim Updaten des Nutzerstatus:", updateErr);
+        }
+
+        // === Jetzt Event-Listener für die beiden Buttons registrieren ===
+
+        // 1) Spieler 1 hat gewonnen
+        async function onP1Click() {
+          // Trage winner ins Spiel ein (entweder p1 oder p2 suchen)
+          const { error: gameUpdateErr } = await supabase
+            .from("games")
+            .update({ winner: p1 })
+            .eq("id", game.id);
+
+          if (gameUpdateErr) {
+            alert("Gewinner konnte nicht registriert werden!");
+            return;
+          }
+
+          // Setze den aktuellen Spieler wieder in_queue
+          const { error: resetErr } = await supabase
+            .from("users")
+            .update({ status: "in_queue" })
+            .eq("id", currentUserId);
+
+          if (resetErr) {
+            console.error("Fehler beim Zurücksetzen des Status:", resetErr);
+          }
+
+          // Spiel aus der Tablle löschen
+          const { error: deleteErr } = await supabase
+            .from("games")
+            .delete()
+            .eq("id", game.id);
+
+          if (deleteErr) {
+            console.error("Fehler beim Löschen des Spiels:", deleteErr);
+          }
+
+          // Game-View aufräumen und User-Liste neu laden
+          deleteGameView();
+          loadUsers();
+
+          // Listener entfernen, damit nicht mehrfach reagiert wird
+          player1Btn.removeEventListener("click", onP1Click);
+          player2Btn.removeEventListener("click", onP2Click);
+        }
+
+        // 2) Spieler 2 hat gewonnen
+        async function onP2Click() {
+          const { error: gameUpdateErr } = await supabase
+            .from("games")
+            .update({ winner: p2 })
+            .eq("id", game.id);
+
+          if (gameUpdateErr) {
+            alert("Gewinner konnte nicht registriert werden!");
+            return;
+          }
+
+          const { error: resetErr } = await supabase
+            .from("users")
+            .update({ status: "in_queue" })
+            .eq("id", currentUserId);
+
+          if (resetErr) {
+            console.error("Fehler beim Zurücksetzen des Status:", resetErr);
+          }
+
+          const { error: deleteErr } = await supabase
+            .from("games")
+            .delete()
+            .eq("id", game.id);
+
+          if (deleteErr) {
+            console.error("Fehler beim Löschen des Spiels:", deleteErr);
+          }
+
+          deleteGameView();
+          loadUsers();
+
+          player1Btn.removeEventListener("click", onP1Click);
+          player2Btn.removeEventListener("click", onP2Click);
+        }
+
+        player1Btn.addEventListener("click", onP1Click);
+        player2Btn.addEventListener("click", onP2Click);
+      }
+    )
+    .subscribe();
+}
+//#endregion
 
 // === Seite initialisieren ===
 document.addEventListener("DOMContentLoaded", async () => {
+
   initializeTabs();
+  const lobbyEl = document.getElementById("lobby");
+  const gameViewEl = document.getElementById("gameView");
 
   document.getElementById("register-btn")?.addEventListener("click", register);
   document.getElementById("login-btn")?.addEventListener("click", login);
@@ -164,7 +392,22 @@ document.addEventListener("DOMContentLoaded", async () => {
       location.reload();
     }
   });
+  document.getElementById("start-game-btn")?.addEventListener("click", start_game);
 
   await updateLoginStatus();
-  await loadUsers();
+
+  // Realtime für die Tabelle hinzufügen
+  supabase
+  .channel("realtime:users")
+  .on(
+    "postgres_changes",
+    { event: "*", schema: "public", table: "users" },
+    async (payload) => {
+      loadUsers(); 
+      }
+  )
+  .subscribe();
+
+  // Realtime für das Userspiel-Interface hinzufügen
+  subscribeToGames();
 });
