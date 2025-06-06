@@ -376,7 +376,7 @@ function subscribeToGames() {
 // === Seite nach DOM Loaded starten === 
 document.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await supabase.auth.getSession();
-  console.log("User ID bekommen?: ", session.user.id)
+  console.log("User ID bekommen?: ", session?.user.id)
   await handleAuthState(session);
 });
 
