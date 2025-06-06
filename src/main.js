@@ -202,8 +202,8 @@ function showGameView(player1Name, player2Name) {
   document.getElementById("lobby")?.classList.add("hidden");
   const btnplayer1 = document.getElementById("player1Btn");
   if (btnplayer1) btnplayer1.textContent = player1Name;
-  const btnplayer2 = document.getElementById("player1Btn");
-  if (btnplayer2) btnplayer2.textContent = player1Name;
+  const btnplayer2 = document.getElementById("player2Btn");
+  if (btnplayer2) btnplayer2.textContent = player2Name;
   document.getElementById("gameView")?.classList.add("visible");
   hasEnteredGameView = true;
 }
@@ -229,26 +229,16 @@ function resetClickListener(id, handler) {
 
 // Button Funktion für Gewinner 1
 async function onP1Click(game, currentUserId, p1) {
-  // Trage winner ins Spiel ein (entweder p1 oder p2 suchen)
-  const { error: gameUpdateErr } = await supabase
-    .from("games")
-    .update({ winner: p1 })
-    .eq("id", game.id);
 
-  if (gameUpdateErr) {
+  // Trage plus Punkt für Gewinner ein
+  const { error: updateError } = await supabase
+  .rpc("increment_user_points", { uid: p1, delta: 1 });
+
+  if (updateError) {
     alert("Gewinner konnte nicht registriert werden!");
     return;
   }
-
-  // Setze den aktuellen Spieler wieder in_queue
-  const { error: resetErr } = await supabase
-    .from("users")
-    .update({ status: "in_queue" })
-    .eq("id", currentUserId);
-
-  if (resetErr) {
-    console.error("Fehler beim Zurücksetzen des Status:", resetErr);
-  }
+  console.log("Gewinner eingetragen");
 
   // Spiel aus der Tablle löschen
   const { error: deleteErr } = await supabase
@@ -258,6 +248,16 @@ async function onP1Click(game, currentUserId, p1) {
 
   if (deleteErr) {
     console.error("Fehler beim Löschen des Spiels:", deleteErr);
+  }
+
+  // Setze den aktuellen Spieler wieder in_queue
+  const { error: resetErr } = await supabase
+  .from("users")
+  .update({ status: "in_queue" })
+  .eq("id", currentUserId);
+
+  if (resetErr) {
+    console.error("Fehler beim Zurücksetzen des Status:", resetErr);
   }
 
   // Game-View aufräumen und User-Liste neu laden
@@ -274,14 +274,22 @@ async function onP1Click(game, currentUserId, p1) {
 
 // Button Funktion für Gewinner 2
 async function onP2Click(game, currentUserId, p2) {
-  const { error: gameUpdateErr } = await supabase
-    .from("games")
-    .update({ winner: p2 })
-    .eq("id", game.id);
+  const { error: updateError } = await supabase
+  .rpc("increment_user_points", { uid: p2, delta: 1 });
 
-  if (gameUpdateErr) {
+  if (updateError) {
     alert("Gewinner konnte nicht registriert werden!");
     return;
+  }
+  console.log("Gewinner eingetragen");
+
+  const { error: deleteErr } = await supabase
+    .from("games")
+    .delete()
+    .eq("id", game.id);
+
+  if (deleteErr) {
+    console.error("Fehler beim Löschen des Spiels:", deleteErr);
   }
 
   const { error: resetErr } = await supabase
@@ -293,15 +301,6 @@ async function onP2Click(game, currentUserId, p2) {
     console.error("Fehler beim Zurücksetzen des Status:", resetErr);
   }
 
-  const { error: deleteErr } = await supabase
-    .from("games")
-    .delete()
-    .eq("id", game.id);
-
-  if (deleteErr) {
-    console.error("Fehler beim Löschen des Spiels:", deleteErr);
-  }
-
   deleteGameView();
   loadUsers();
 
@@ -309,67 +308,6 @@ async function onP2Click(game, currentUserId, p2) {
   p2ClickHandler = () => onP2Click(game, currentUserId, p2);
   document.getElementById("player1Btn")?.removeEventListener("click", p1ClickHandler);
   document.getElementById("player2Btn")?.removeEventListener("click", p2ClickHandler);
-}
-
-// === RealTime API für neue/aktualisierte Einträge in "games" ===
-function subscribeToGames() {
-  // Haupt-Subscription
-  supabase
-    .channel("realtime:games")
-    .on(
-      "postgres_changes",
-      { event: "*", schema: "public", table: "games" },
-      async (payload) => {
-        if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") {
-          return;
-        }
-
-        const game = payload.new;
-        if (!game) return;
-
-        // Aktuelle User-ID ermitteln
-        const currentUserId = await getUserId();
-        if (!currentUserId) return;
-
-        // Falls der aktuelle User nicht zu diesem Spiel gehört, abbrechen
-        if (game.player1 !== currentUserId && game.player2 !== currentUserId) {
-          return;
-        }
-
-        if (hasEnteredGameView) {
-          return;
-        }
-
-        // Spieler-Namen aus der users-Tabelle laden
-        const p1 = game.player1;
-        const p2 = game.player2;
-        const { data: users, error: userErr } = await supabase
-          .from("users")
-          .select("id, username")
-          .in("id", [p1, p2]);
-
-        if (userErr || !users) {
-          console.error("Fehler beim Laden der Spielernamen:", userErr);
-          return;
-        }
-
-        // In eine Map packen, um schnellen Zugriff per ID zu haben
-        const userMap = {};
-        users.forEach((u) => {
-          userMap[u.id] = u.username;
-        });
-
-        // Game-View anzeigen
-        showGameView(userMap[p1], userMap[p2]);
-
-        // Beide Event Listener hinzufügen
-        document.getElementById("player1Btn")
-          .addEventListener("click", () => onP1Click(game, currentUserId, p1));
-        document.getElementById("player2Btn")
-          .addEventListener("click", () => onP2Click(game, currentUserId, p2));
-      }
-    )
-    .subscribe();
 }
 //#endregion
 
@@ -420,13 +358,14 @@ async function handleAuthState(session) {
     await updateLoginStatus();
     await loadUsers();
 
-    // Realtime für die Tabelle hinzufügen
+    // === Realtime für die Tabelle hinzufügen ===
     supabase
     .channel("realtime:users")
     .on(
       "postgres_changes",
       { event: "*", schema: "public", table: "users" },
       async (payload) => {
+        console.log("Subscribe zum User Table wurde aufgerufen ...");
         loadUsers(); 
         }
     )
@@ -442,6 +381,7 @@ async function handleAuthState(session) {
       
       if (user.status === "paired") {
         // Eigenes Spiel holen
+        console.log("User hat schon ein Match ...");
         const { data: mygame, error: gameError } = await supabase
             .from("games")
             .select("*")
@@ -449,6 +389,7 @@ async function handleAuthState(session) {
             .single();
         
         // Spieler-Namen aus der users-Tabelle laden
+        console.log("Spiel gefunden, Spiel ID: ", mygame.id);
         const p1 = mygame.player1;
         const p2 = mygame.player2;
         const { data: users, error: userErr } = await supabase
@@ -480,8 +421,66 @@ async function handleAuthState(session) {
       }
     }
 
-    // Realtime für das Userspiel-Interface hinzufügen
-    subscribeToGames();
+    // === Realtime für das Userspiel-Interface hinzufügen ===
+    supabase
+      .channel("realtime:games")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "games" },
+        async (payload) => {
+          console.log("Subscribe zum Games Table wurde aufgerufen ...");
+          if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") {
+            return;
+          }
+  
+          const game = payload.new;
+          if (!game) return;
+  
+          // Aktuelle User-ID ermitteln
+          const currentUserId = await getUserId();
+          if (!currentUserId) return;
+  
+          // Falls der aktuelle User nicht zu diesem Spiel gehört, abbrechen
+          if (game.player1 !== currentUserId && game.player2 !== currentUserId) {
+            return;
+          }
+  
+          if (hasEnteredGameView) {
+            return;
+          }
+  
+          // Spieler-Namen aus der users-Tabelle laden
+          const p1 = game.player1;
+          const p2 = game.player2;
+          const { data: users, error: userErr } = await supabase
+            .from("users")
+            .select("id, username")
+            .in("id", [p1, p2]);
+  
+          if (userErr || !users) {
+            console.error("Fehler beim Laden der Spielernamen:", userErr);
+            return;
+          }
+  
+          // In eine Map packen, um schnellen Zugriff per ID zu haben
+          const userMap = {};
+          users.forEach((u) => {
+            userMap[u.id] = u.username;
+          });
+  
+          // Game-View anzeigen
+          console.log("Zeige GameView für ", userMap[p1], userMap[p2])
+          showGameView(userMap[p1], userMap[p2]);
+  
+          // Beide Event Listener hinzufügen
+          document.getElementById("player1Btn")
+            .addEventListener("click", () => onP1Click(game, currentUserId, p1));
+          document.getElementById("player2Btn")
+            .addEventListener("click", () => onP2Click(game, currentUserId, p2));
+        }
+      )
+      .subscribe();
+    
 
   } else {
     initializeTabs();
