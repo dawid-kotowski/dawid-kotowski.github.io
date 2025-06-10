@@ -98,7 +98,10 @@ async function insertUserIntoDatabase(userId, username) {
 
 // === Nutzer laden ===
 async function loadUsers() {
-  const { data, error } = await supabase.from("users").select("username, created_at");
+  const { data, error } = await supabase
+                          .from("users")
+                          .select("username, points")
+                          .order("points", { ascending: false });
   if (error) {
     console.error("Fehler beim Laden:", error);
     return;
@@ -108,7 +111,7 @@ async function loadUsers() {
   tbody.innerHTML = "";
   data.forEach(user => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${user.username}</td><td>${new Date(user.created_at).toLocaleString()}</td>`;
+    tr.innerHTML = `<td>${user.username}</td><td>${user.points}</td>`;
     tbody.appendChild(tr);
   });
 }
@@ -131,9 +134,10 @@ async function updateLoginStatus() {
       statusElement.textContent = `Angemeldet als ${userData.username} (${userData.role})`;
     }
 
-    if (userData.role === "admin") {
+    const AdminPanel = document.getElementById("adminPanel");
+    if (userData.role === "admin" && AdminPanel?.classList.contains("hidden")) {
       // Hier Admin Scheiß reinmachen
-      document.getElementById("adminPanel")?.classList.remove("hidden");
+      AdminPanel?.classList.remove("hidden");
     }
 
   } else {
@@ -148,14 +152,14 @@ function initializeTabs() {
   const loginForm = document.getElementById('loginForm');
   const registerForm = document.getElementById('registerForm');
 
-  loginTab.addEventListener('click', () => {
+  loginTab?.addEventListener('click', () => {
     loginTab.classList.add('active');
     registerTab.classList.remove('active');
     loginForm.classList.add('active');
     registerForm.classList.remove('active');
   });
 
-  registerTab.addEventListener('click', () => {
+  registerTab?.addEventListener('click', () => {
     registerTab.classList.add('active');
     loginTab.classList.remove('active');
     registerForm.classList.add('active');
@@ -163,10 +167,10 @@ function initializeTabs() {
   });
 
   // Standardmäßig Login anzeigen
-  loginTab.classList.add('active');
-  registerTab.classList.remove('active');
-  loginForm.classList.add('active');
-  registerForm.classList.remove('active');
+  loginTab?.classList.add('active');
+  registerTab?.classList.remove('active');
+  loginForm?.classList.add('active');
+  registerForm?.classList.remove('active');
 }
 //#endregion
 
@@ -177,7 +181,8 @@ async function start_game() {
   let startTime = Date.now();
   const interval = setInterval(async () => {
     const now = Date.now();
-    if (now - startTime > 4 * 15 * 1000) {
+    console.log("Start Game auf Edge aufgerufen...")
+    if (now - startTime > 2 * 1000) {
       clearInterval(interval);
       return;
     }
@@ -191,7 +196,7 @@ async function start_game() {
       },
     });
     console.log(response.data);
-  }, 30000); // alle 30s
+  }, 2000); // alle 2s
 }
 
 // Flag für Game-View
@@ -267,7 +272,9 @@ async function onP1Click(game, currentUserId, p1) {
   // Listener entfernen, damit nicht mehrfach reagiert wird
   p1ClickHandler = () => onP1Click(game, currentUserId, p1);
   p2ClickHandler = () => onP2Click(game, currentUserId, p2);
+  if (p1ClickHandler)
   document.getElementById("player1Btn")?.removeEventListener("click", p1ClickHandler);
+  if (p2ClickHandler)
   document.getElementById("player2Btn")?.removeEventListener("click", p2ClickHandler);
 
 }
@@ -315,6 +322,21 @@ async function onP2Click(game, currentUserId, p2) {
 document.addEventListener("DOMContentLoaded", async () => {
   const { data: { session } } = await supabase.auth.getSession();
   console.log("User ID bekommen?: ", session?.user.id)
+
+  // Logout und Interface nach Auth
+  document.getElementById("logout-btn")?.addEventListener("click", async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      console.error("Fehler beim Ausloggen:", error);
+      alert("Fehler beim Ausloggen.");
+    } else {
+      alert("Erfolgreich ausgeloggt.");
+      location.reload();
+    }
+  });
+  document.getElementById("start-game-btn")?.addEventListener("click", start_game);
+
+  // Deal with Authentification
   await handleAuthState(session);
 });
 
@@ -327,25 +349,14 @@ supabase.auth.onAuthStateChange((event, session) => {
 async function handleAuthState(session) {
   console.log("Handle Auth aufgerufen...")
   if (session?.user) {
-    // Logout und Interface nach Auth
-    document.getElementById("logout-btn")?.addEventListener("click", async () => {
-      const { error } = await supabase.auth.signOut();
-      if (error) {
-        console.error("Fehler beim Ausloggen:", error);
-        alert("Fehler beim Ausloggen.");
-      } else {
-        alert("Erfolgreich ausgeloggt.");
-        location.reload();
-      }
-    });
-    document.getElementById("start-game-btn")?.addEventListener("click", start_game);
-
+    // Sichergehen mit dem Logout Buttom
+    const logoutBtn = document.getElementById("logout-btn");
+    if (logoutBtn?.classList.contains("hidden")) logoutBtn?.classList.remove("hidden");
     // Lösche den ganzen Login Kram aus der View
     const loginTab = document.getElementById('loginTab');
     if (loginTab?.classList.contains("active")) {
       loginTab.classList.remove("active");
     }
-
     const loginForm = document.getElementById('loginForm');
     if (loginForm?.classList.contains("active")) {
       loginForm.classList.remove("active");
@@ -385,10 +396,24 @@ async function handleAuthState(session) {
         const { data: mygame, error: gameError } = await supabase
             .from("games")
             .select("*")
-            .or(`player1_id.eq.${session.user.id},player2_id.eq.${session.user.id}`)
-            .single();
+            .or(`player1.eq.${session.user.id},player2.eq.${session.user.id}`)
+            .maybeSingle();
         
         // Spieler-Namen aus der users-Tabelle laden
+        if (!mygame || gameError) {
+          console.log("Kein Spiel trotz paired Status gefunden.");
+
+          const { error: resetErr } = await supabase
+          .from("users")
+          .update({ status: "in_queue" })
+          .eq("id", session.user.id);
+
+          if (resetErr) {
+            console.error("Fehler beim Zurücksetzen des Status:", resetErr);
+          }
+          console.log("Wieder auf in_queue gesetzt.")
+          return;
+        }
         console.log("Spiel gefunden, Spiel ID: ", mygame.id);
         const p1 = mygame.player1;
         const p2 = mygame.player2;
@@ -484,6 +509,7 @@ async function handleAuthState(session) {
 
   } else {
     initializeTabs();
+    document.getElementById("logout-btn")?.classList.add("hidden");
     resetClickListener("login-btn", login);
     resetClickListener("register-btn", register);
   }
