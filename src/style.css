@@ -127,6 +127,14 @@ button:hover {
   transition: opacity 0.3s ease;
 }
 
+#timer-bar {
+  position: relative;
+  height: 20px;
+  background-color: #333;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
 #gameView {
   background-color: #f5f5f5;
   color: #1e1e1e;

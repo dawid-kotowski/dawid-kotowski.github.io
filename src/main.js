@@ -1,4 +1,5 @@
 import './style.css'
+import ProgressBar from 'progressbar.js'
 import { createClient } from '@supabase/supabase-js'
 
 const supabase = createClient("https://gwusxowacqvutyrqxqgq.supabase.co", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd3dXN4b3dhY3F2dXR5cnF4cWdxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDgwMDQ0NDIsImV4cCI6MjA2MzU4MDQ0Mn0.a3TKGAcxTXKHS8VCKLPwSm2z0HSymzlGgmiKkZPJDj4");
@@ -81,8 +82,11 @@ async function insertUserIntoDatabase(userId, username) {
   const { error: dbError } = await supabase.from("users").insert([
     { id: userId, username: username, points: 0, role: 'user' }
   ]);
+  const { error: sorteddbError } = await supabase.from("users_sorted").insert([
+    { id: userId, username: username }
+  ]);
 
-  if (dbError) {
+  if (dbError || sorteddbError) {
     console.error("Fehler beim Schreiben in users-Tabelle:", dbError);
     alert("Registrierung fehlgeschlagen: Userdaten konnten nicht gespeichert werden.");
   } else {
@@ -132,12 +136,18 @@ async function updateLoginStatus() {
 
     if (userData) {
       statusElement.textContent = `Angemeldet als ${userData.username} (${userData.role})`;
-    }
 
-    const AdminPanel = document.getElementById("adminPanel");
-    if (userData.role === "admin" && AdminPanel?.classList.contains("hidden")) {
-      // Hier Admin Scheiß reinmachen
-      AdminPanel?.classList.remove("hidden");
+      const AdminPanel = document.getElementById("adminPanel");
+      const TimerPanel = document.getElementById("countdown");
+      if (userData.role === "admin") {
+        // Hier Admin Scheiß reinmachen
+        if (AdminPanel?.classList.contains("hidden")) {
+          AdminPanel?.classList.remove("hidden");
+        }
+        if (TimerPanel?.classList.contains("hidden")) {
+          TimerPanel?.classList.remove("hidden");
+        }
+      }
     }
 
   } else {
@@ -177,26 +187,55 @@ function initializeTabs() {
 
 //#region Spiellogik
 // === Spiel Start Einstellungen ===
+let round = 0;
+let countdownBar = null;
 async function start_game() {
-  let startTime = Date.now();
-  const interval = setInterval(async () => {
-    const now = Date.now();
-    console.log("Start Game auf Edge aufgerufen...")
-    if (now - startTime > 2 * 1000) {
-      clearInterval(interval);
-      return;
-    }
-    const { data: { session } } = await supabase.auth.getSession();
-    console.log("Nutze hier Access-Token: ", session.access_token);
-    const response = await supabase.functions.invoke("start_game", {
-      method: "POST",
-      headers: {
-        // zwingend das aktuelle Access-Token des eingeloggten Nutzers
-        "Authorization": `Bearer ${session.access_token}`,
-      },
+  round++;
+  const duration = 120; // Sekunden für eine Runde
+
+  // Progress Bar einfügen
+  if (!countdownBar) {
+    countdownBar = new ProgressBar.Line('#timer-bar', {
+      strokeWidth: 4,
+      duration: duration * 1000,
+      color: '#84b9ff',
+      trailColor: '#444',
+      trailWidth: 2,
+      svgStyle: { width: '100%', height: '20px' },
+      text: { style: { color: '#fff', position: 'absolute', right: '0', top: '-1.5rem', padding: 0 } },
+      step: (state, bar) => {
+        const remaining = Math.ceil((1 - bar.value()) * duration);
+        document.getElementById('countdown').innerText = `Runde: ${round} gestartet mit ${remaining}s verbleibend`;
+      }
     });
-    console.log(response.data);
-  }, 2000); // alle 2s
+  } else {
+    countdownBar.destroy();
+    countdownBar = new ProgressBar.Line('#timer-bar', {
+      strokeWidth: 4,
+      duration: duration * 1000,
+      color: '#84b9ff',
+      trailColor: '#444',
+      trailWidth: 2,
+      svgStyle: { width: '100%', height: '20px' },
+      text: { style: { color: '#fff', position: 'absolute', right: '0', top: '-1.5rem', padding: 0 } },
+      step: (state, bar) => {
+        const remaining = Math.ceil((1 - bar.value()) * duration);
+        document.getElementById('countdown').innerText = `Runde: ${round} gestartet mit ${remaining}s verbleibend`;
+      }
+    });
+  }
+  countdownBar.animate(1.0);
+  
+  // Edge Funktion aktivieren
+  const { data: { session } } = await supabase.auth.getSession();
+  const {data, error } = await supabase.functions.invoke('alt_start_game', {
+    body: { name: 'Functions', round: round},
+  })
+  if (error) {
+    console.error('EdgeFunctionError', error);
+  } else {
+    console.log("alt_start_game aufgerufen in Runde ", round);
+  }
 }
 
 // Flag für Game-View
@@ -235,21 +274,39 @@ function resetClickListener(id, handler) {
 // Button Funktion für Gewinner 1
 async function onP1Click(game, currentUserId, p1) {
 
-  // Trage plus Punkt für Gewinner ein
-  const { error: updateError } = await supabase
-  .rpc("increment_user_points", { uid: p1, delta: 1 });
+  // Gewinner checken
+  const winner = game.winner;
 
-  if (updateError) {
-    alert("Gewinner konnte nicht registriert werden!");
-    return;
+  if (!winner) {
+    const {error: updateWinnerError } = await supabase
+      .from("games")
+      .update({ winner: p1 })
+      .eq("id", game.id);
+    
+    if (updateWinnerError) {
+      console.log("Fehler beim Winner Update.");
+    }
   }
-  console.log("Gewinner eingetragen");
+
+  if (winner && winner === p1) { 
+    // Trage plus Punkt für Gewinner ein
+    const { error: updateError } = await supabase
+    .rpc("increment_user_points", { uid: p1, delta: 1 });
+
+    if (updateError) {
+      alert("Gewinner konnte nicht registriert werden!");
+      return;
+    }
+    console.log("Gewinner eingetragen");
+  } else {
+    alert("Na toll, weil ihr euch uneinig wart, kriegt keiner einen Punkt.");
+  }
 
   // Spiel aus der Tablle löschen
   const { error: deleteErr } = await supabase
-    .from("games")
-    .delete()
-    .eq("id", game.id);
+  .from("games")
+  .delete()
+  .eq("id", game.id);
 
   if (deleteErr) {
     console.error("Fehler beim Löschen des Spiels:", deleteErr);
@@ -281,19 +338,38 @@ async function onP1Click(game, currentUserId, p1) {
 
 // Button Funktion für Gewinner 2
 async function onP2Click(game, currentUserId, p2) {
-  const { error: updateError } = await supabase
-  .rpc("increment_user_points", { uid: p2, delta: 1 });
 
-  if (updateError) {
-    alert("Gewinner konnte nicht registriert werden!");
-    return;
+  const winner = game.winner;
+  
+  if (!winner) {
+    const {error: updateWinnerError } = await supabase
+      .from("games")
+      .update({ winner: p2 })
+      .eq("id", game.id);
+    
+    if (updateWinnerError) {
+      console.log("Fehler beim Winner Update.");
+    }
   }
-  console.log("Gewinner eingetragen");
+
+  if (winner && winner === p2) { 
+
+    const { error: updateError } = await supabase
+    .rpc("increment_user_points", { uid: p2, delta: 1 });
+
+    if (updateError) {
+      alert("Gewinner konnte nicht registriert werden!");
+      return;
+    }
+    console.log("Gewinner eingetragen");
+  } else {
+    alert("Na toll, weil ihr euch uneinig wart, kriegt keiner einen Punkt.");
+  }
 
   const { error: deleteErr } = await supabase
-    .from("games")
-    .delete()
-    .eq("id", game.id);
+  .from("games")
+  .delete()
+  .eq("id", game.id);
 
   if (deleteErr) {
     console.error("Fehler beim Löschen des Spiels:", deleteErr);
@@ -418,7 +494,7 @@ async function handleAuthState(session) {
         const p1 = mygame.player1;
         const p2 = mygame.player2;
         const { data: users, error: userErr } = await supabase
-          .from("users")
+          .from("users_sorted")
           .select("id, username")
           .in("id", [p1, p2]);
 
@@ -478,7 +554,7 @@ async function handleAuthState(session) {
           const p1 = game.player1;
           const p2 = game.player2;
           const { data: users, error: userErr } = await supabase
-            .from("users")
+            .from("users_sorted")
             .select("id, username")
             .in("id", [p1, p2]);
   
