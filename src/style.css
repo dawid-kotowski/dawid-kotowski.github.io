@@ -188,6 +188,10 @@ th, td {
   border-bottom: 1px solid #555;
 }
 
+tr.top1 { color: #007ACC; font-weight: bold; }
+tr.top2 { color: #339CFF; font-weight: bold; }
+tr.top3 { color: #84b9ff; font-weight: bold; }
+
 /* === Rules Table === */
 .lobby-content {
   display: flex;

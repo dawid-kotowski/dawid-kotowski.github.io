@@ -103,9 +103,10 @@ async function insertUserIntoDatabase(userId, username) {
 // === Nutzer laden ===
 async function loadUsers() {
   const { data, error } = await supabase
-                          .from("users")
-                          .select("username, points")
-                          .order("points", { ascending: false });
+    .from("users")
+    .select("username, points")
+    .order("points", { ascending: false });
+
   if (error) {
     console.error("Fehler beim Laden:", error);
     return;
@@ -113,12 +114,41 @@ async function loadUsers() {
 
   const tbody = document.querySelector("#usertable tbody");
   tbody.innerHTML = "";
-  data.forEach(user => {
+
+  data.forEach((user, index) => {
     const tr = document.createElement("tr");
-    tr.innerHTML = `<td>${user.username}</td><td>${user.points}</td>`;
+
+    // Platznummer + Emoji
+    let place = index + 1;
+    let emoji = "";
+    let cssClass = "";
+
+    if (index === 0) {
+      emoji = "🏆";
+      cssClass = "top1";
+    } else if (index === 1) {
+      emoji = "🥈";
+      cssClass = "top2";
+    } else if (index === 2) {
+      emoji = "🥉";
+      cssClass = "top3";
+    }
+
+    tr.innerHTML = `
+      <td>${place}. ${emoji}</td>
+      <td>${user.username}</td>
+      <td>${user.points}</td>
+    `;
+
+    if (cssClass) {
+      tr.classList.add(cssClass);
+    }
+
     tbody.appendChild(tr);
   });
 }
+
+
 
 // === Login-Status anzeigen ===
 async function updateLoginStatus() {
@@ -192,6 +222,17 @@ let countdownBar = null;
 async function start_game() {
   round++;
   await clearAllGames();
+
+  // Guard gegen ungerade Spieleranzahl
+  const ownid = await getUserId();
+  console.log("Got own Id ", ownid);
+  const {data: users_in_queue, error: userErr} = await supabase
+    .from("users_sorted")
+    .select("id")
+    .neq("id", ownid);
+  
+  if (users_in_queue.length % 2 !== 0) alert('Ungerade Anzahl an Spielern! Matchmaking nicht möglich.');
+
   const duration = 600; // Sekunden für eine Runde (10 minuten gerade)
 
   // Progress Bar einfügen
@@ -416,6 +457,16 @@ async function onP2Click(game, currentUserId, p2) {
   document.getElementById("player1Btn")?.removeEventListener("click", p1ClickHandler);
   document.getElementById("player2Btn")?.removeEventListener("click", p2ClickHandler);
 }
+
+async function end_game() {
+  document.getElementById("rules-board")?.classList.add("hidden");
+  document.getElementById("status")?.classList.add("hidden");
+  const countdownBar = document.getElementById("countdown");
+  if (!countdownBar?.classList.contains("hidden")) countdownBar.classList.add("hidden");
+  document.getElementById("timerbar")?.classList.add("hidden");
+
+  await loadUsers();
+}
 //#endregion
 
 // === Seite nach DOM Loaded starten === 
@@ -435,6 +486,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   });
   document.getElementById("start-game-btn")?.addEventListener("click", start_game);
+  document.getElementById("determine-winner-btn")?.addEventListener("click", end_game);
 
   // Deal with Authentification
   await handleAuthState(session);
@@ -531,6 +583,14 @@ async function handleAuthState(session) {
           return;
         }
 
+        // Keyword laden
+        const { data: keyword, error: keywordErr } = await supabase.rpc("get_random_keyword");
+        if (keywordErr) {
+          console.error("Konnte kein Keyword finden.");
+        } else if (keyword) {
+          document.getElementById("player-keyword").textContent = keyword;
+        }
+
         // In eine Map packen, um schnellen Zugriff per ID zu haben
         const userMap = {};
         users.forEach((u) => {
@@ -625,6 +685,14 @@ async function handleAuthState(session) {
           if (userErr || !users) {
             console.error("Fehler beim Laden der Spielernamen:", userErr);
             return;
+          }
+
+          // Keyword laden
+          const { data: keyword, error: keywordErr } = await supabase.rpc("get_random_keyword");
+          if (keywordErr) {
+            console.error("Konnte kein Keyword finden.");
+          } else if (keyword) {
+            document.getElementById("player-keyword").textContent = keyword;
           }
   
           // In eine Map packen, um schnellen Zugriff per ID zu haben

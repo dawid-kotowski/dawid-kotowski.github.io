@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login</title>
   <link rel="icon" type="image/x-icon" href="/assets/favicon-ClGGMB7h.ico" />
-  <script type="module" crossorigin src="/assets/index-mX_pW8SH.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-ClhC6b3Q.css">
+  <script type="module" crossorigin src="/assets/index-DfNx0QqO.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-FiqGkE_b.css">
 </head>
 <body>
   <div id="app">
@@ -18,7 +18,7 @@
 
     <div id="lobby">
       <div class="lobby-content">
-        <div class="rules-board">
+        <div id="rules-board" class="rules-board">
           <h3>Spielregeln</h3>
           <p class="rules-intro">Gewinne so viele Runden, wie es geht!</p>
         
@@ -78,11 +78,13 @@
 
       <div id="adminPanel" class="hidden">
         <h2>Admin-Bereich</h2>
-        <button type="button" id="start-game-btn" class="centered">Starte Runde</button>
+        <div class="centered">
+          <button type="button" id="start-game-btn">Starte Runde</button>
+          <button type="button" id="determine-winner-btn">Spielschluss!</button>
+        </div>
       </div>
   
       <div id="countdown" class="hidden">
-        <p>Rundentimer</p>
       </div>
       <div id="timer-bar"></div> 
     </div>
@@ -92,7 +94,8 @@
       <table id="usertable">
         <thead>
           <tr>
-            <th>Benutzername</th>
+            <th>Platz</th>
+            <th>Spieler</th>
             <th>Punkte</th>
           </tr>
         </thead>
