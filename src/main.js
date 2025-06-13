@@ -307,6 +307,8 @@ async function clearAllGames() {
 
 // Hilfsfunktion zum Einblenden der Game-View
 function showGameView(player1Name, player2Name) {
+  userTable = document.getElementById("usertabletab");
+  if (!userTable?.classList.contains("hidden")) userTable.classList.add("hidden");
   document.getElementById("lobby")?.classList.add("hidden");
   const btnplayer1 = document.getElementById("player1Btn");
   if (btnplayer1) btnplayer1.textContent = player1Name;
@@ -317,7 +319,9 @@ function showGameView(player1Name, player2Name) {
 }
 
 // Hilfsfunktion zum Aufräumen (Game-View ausblenden, Listener entfernen)
-function deleteGameView() {
+async function deleteGameView() {
+  userTable = document.getElementById("usertabletab");
+  if (userTable?.classList.contains("hidden")) userTable.classList.remove("hidden");
   document.getElementById("gameView")?.classList.remove("visible");
   document.getElementById("lobby")?.classList.remove("hidden");
   document.getElementById("player1Btn").replaceWith(document.getElementById("player1Btn").cloneNode(true));
@@ -334,6 +338,10 @@ function resetClickListener(id, handler) {
     newBtn.addEventListener("click", handler);
   }
 }
+
+// Setze schonmal beide Funktionen für den Click
+let p1ClickHandler = null;
+let p2ClickHandler = null;
 
 // Button Funktion für Gewinner 1
 async function onP1Click(game, currentUserId, p1) {
@@ -387,17 +395,8 @@ async function onP1Click(game, currentUserId, p1) {
   }
 
   // Game-View aufräumen und User-Liste neu laden
-  deleteGameView();
+  await deleteGameView();
   loadUsers();
-
-  // Listener entfernen, damit nicht mehrfach reagiert wird
-  p1ClickHandler = () => onP1Click(game, currentUserId, p1);
-  p2ClickHandler = () => onP2Click(game, currentUserId, p2);
-  if (p1ClickHandler)
-  document.getElementById("player1Btn")?.removeEventListener("click", p1ClickHandler);
-  if (p2ClickHandler)
-  document.getElementById("player2Btn")?.removeEventListener("click", p2ClickHandler);
-
 }
 
 // Button Funktion für Gewinner 2
@@ -449,13 +448,9 @@ async function onP2Click(game, currentUserId, p2) {
     console.error("Fehler beim Zurücksetzen des Status:", resetErr);
   }
 
-  deleteGameView();
+  await deleteGameView();
   loadUsers();
-
-  p1ClickHandler = () => onP1Click(game, currentUserId, p1);
-  p2ClickHandler = () => onP2Click(game, currentUserId, p2);
-  document.getElementById("player1Btn")?.removeEventListener("click", p1ClickHandler);
-  document.getElementById("player2Btn")?.removeEventListener("click", p2ClickHandler);
+  
 }
 
 async function end_game() {
@@ -599,14 +594,13 @@ async function handleAuthState(session) {
 
         // Game-View anzeigen
         showGameView(userMap[p1], userMap[p2]);
-        hasEnteredGameView = true;
 
         // Beide Event Listener hinzufügen
         const currentUserId = session.user.id;
-        document.getElementById("player1Btn")
-          .addEventListener("click", () => onP1Click(mygame, currentUserId, p1));
-        document.getElementById("player2Btn")
-          .addEventListener("click", () => onP2Click(mygame, currentUserId, p2));
+        p1ClickHandler = () => onP1Click(mygame, currentUserId, p1);
+        p2ClickHandler = () => onP2Click(mygame, currentUserId, p2);
+        resetClickListener("player1Btn", p1ClickHandler);
+        resetClickListener("player2Btn", p2ClickHandler);
       }
     }
 
@@ -617,47 +611,49 @@ async function handleAuthState(session) {
         "postgres_changes",
         { event: "*", schema: "public", table: "games" },
         async (payload) => {
-          console.log("Subscribe zum Games Table wurde aufgerufen ...");
-          if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE" && payload.eventType === "DELETE") {
-            if (hasEnteredGameView) {
-              const { data: userStatus, error: statusError} = await supabase
+          const { data: userStatus, error: statusError} = await supabase
                 .from("users")
                 .select("id, status")
                 .eq("id", session.user.id)
                 .single();
-              
-              if (userStatus === "paired") {
-                // Eigenes Spiel holen
-                console.log("User hat schon ein Match ...");
-                const { data: mygame, error: gameError } = await supabase
-                    .from("games")
-                    .select("*")
-                    .or(`player1.eq.${session.user.id},player2.eq.${session.user.id}`)
-                    .maybeSingle();
-                
-                // Mein GameView löschen, falls mein Spiel entfernt wurde
-                if (!mygame || gameError) {
-                  console.log("Kein Spiel gefunden.");
-        
-                  const { error: resetErr } = await supabase
-                  .from("users")
-                  .update({ status: "in_queue" })
-                  .eq("id", session.user.id);
-        
-                  if (resetErr) {
-                    console.error("Fehler beim Zurücksetzen des Status:", resetErr);
-                  }
-                  console.log("Wieder auf in_queue gesetzt.")
+          console.log("Subscribe zum Games Table wurde aufgerufen mit USer Status ", userStatus.status);
+          // Sichergehen, dass der Spieler noch aktiv ist      
+          if (userStatus.status === "in_queue") {
+            console.log("Überspringt realtime:games, da ", userStatus.status, ". Flag für GameView ist ", hasEnteredGameView);
+            return;
+          }
 
-                  deleteGameView();
-                } else {
-                  console.log("Delete eines Games stattgefunden, aber wohl nicht das eigene Spiel.");
+          if (payload.eventType === "DELETE") {
+            if (hasEnteredGameView) {
+              // Eigenes Spiel holen
+              console.log("User hat schon ein Match ...");
+              const { data: mygame, error: gameError } = await supabase
+                  .from("games")
+                  .select("*")
+                  .or(`player1.eq.${session.user.id},player2.eq.${session.user.id}`)
+                  .maybeSingle();
+              
+              // Mein GameView löschen, falls mein Spiel entfernt wurde
+              if (!mygame || gameError) {
+                console.log("Kein Spiel gefunden.");
+      
+                const { error: resetErr } = await supabase
+                .from("users")
+                .update({ status: "in_queue" })
+                .eq("id", session.user.id);
+      
+                if (resetErr) {
+                  console.error("Fehler beim Zurücksetzen des Status:", resetErr);
                 }
+                console.log("Wieder auf in_queue gesetzt.")
+
+                deleteGameView();
+              } else {
+                console.log("Delete eines Games stattgefunden, aber wohl nicht das eigene Spiel.");
               }
             }
             return;
           }
-  
           const game = payload.new;
           if (!game) return;
   
@@ -706,10 +702,10 @@ async function handleAuthState(session) {
           showGameView(userMap[p1], userMap[p2]);
   
           // Beide Event Listener hinzufügen
-          document.getElementById("player1Btn")
-            .addEventListener("click", () => onP1Click(game, currentUserId, p1));
-          document.getElementById("player2Btn")
-            .addEventListener("click", () => onP2Click(game, currentUserId, p2));
+          p1ClickHandler = () => onP1Click(game, currentUserId, p1);
+          p2ClickHandler = () => onP2Click(game, currentUserId, p2);
+          resetClickListener("player1Btn", p1ClickHandler);
+          resetClickListener("player2Btn", p2ClickHandler);
         }
       )
       .subscribe();
