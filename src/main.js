@@ -307,7 +307,7 @@ async function clearAllGames() {
 
 // Hilfsfunktion zum Einblenden der Game-View
 function showGameView(player1Name, player2Name) {
-  userTable = document.getElementById("usertabletab");
+  const userTable = document.getElementById("usertabletab");
   if (!userTable?.classList.contains("hidden")) userTable.classList.add("hidden");
   document.getElementById("lobby")?.classList.add("hidden");
   const btnplayer1 = document.getElementById("player1Btn");
@@ -320,7 +320,7 @@ function showGameView(player1Name, player2Name) {
 
 // Hilfsfunktion zum Aufräumen (Game-View ausblenden, Listener entfernen)
 async function deleteGameView() {
-  userTable = document.getElementById("usertabletab");
+  const userTable = document.getElementById("usertabletab");
   if (userTable?.classList.contains("hidden")) userTable.classList.remove("hidden");
   document.getElementById("gameView")?.classList.remove("visible");
   document.getElementById("lobby")?.classList.remove("hidden");
