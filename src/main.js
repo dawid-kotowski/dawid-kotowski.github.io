@@ -191,7 +191,8 @@ let round = 0;
 let countdownBar = null;
 async function start_game() {
   round++;
-  const duration = 120; // Sekunden für eine Runde
+  await clearAllGames();
+  const duration = 600; // Sekunden für eine Runde (10 minuten gerade)
 
   // Progress Bar einfügen
   if (!countdownBar) {
@@ -241,6 +242,28 @@ async function start_game() {
 // Flag für Game-View
 let hasEnteredGameView = false;
 
+// Hilfsfunktion zum alle Spiele aus SQL löschen, falls nötig
+async function clearAllGames() {
+  console.log("Clear Funktion aufgerufen. Erwarte löschen aller Spiele...");
+  const myid = await getUserId();
+  const { error: userErr } = await supabase
+    .from("users")
+    .update({ status: "in_queue" })
+    .neq("id", myid);
+  if (userErr) {
+    console.error("Fehler beim Zurücksetzen der Benutzerstatus:", userErr);
+  } else {
+    console.log("Alle Spieler wieder auf in_queue gesetzt.")
+  }
+
+  const { error: gameErr } = await supabase.rpc("delete_all_games")
+  if (gameErr) {
+    console.error("Fehler beim Löschen der Spiele:", gameErr);
+  } else {
+    console.log("Alle Spiele erfolgreich gelöscht");
+  }
+}
+
 // Hilfsfunktion zum Einblenden der Game-View
 function showGameView(player1Name, player2Name) {
   document.getElementById("lobby")?.classList.add("hidden");
@@ -286,30 +309,30 @@ async function onP1Click(game, currentUserId, p1) {
     if (updateWinnerError) {
       console.log("Fehler beim Winner Update.");
     }
-  }
-
-  if (winner && winner === p1) { 
-    // Trage plus Punkt für Gewinner ein
-    const { error: updateError } = await supabase
-    .rpc("increment_user_points", { uid: p1, delta: 1 });
-
-    if (updateError) {
-      alert("Gewinner konnte nicht registriert werden!");
-      return;
-    }
-    console.log("Gewinner eingetragen");
   } else {
-    alert("Na toll, weil ihr euch uneinig wart, kriegt keiner einen Punkt.");
-  }
+    if (winner && winner === p1) { 
+      // Trage plus Punkt für Gewinner ein
+      const { error: updateError } = await supabase
+      .rpc("increment_user_points", { uid: p1, delta: 1 });
 
-  // Spiel aus der Tablle löschen
-  const { error: deleteErr } = await supabase
-  .from("games")
-  .delete()
-  .eq("id", game.id);
+      if (updateError) {
+        alert("Gewinner konnte nicht registriert werden!");
+        return;
+      }
+      console.log("Gewinner eingetragen");
+    } else {
+      alert("Na toll, weil ihr euch uneinig wart, kriegt keiner einen Punkt.");
+    }
 
-  if (deleteErr) {
-    console.error("Fehler beim Löschen des Spiels:", deleteErr);
+    // Spiel aus der Tablle löschen
+    const { error: deleteErr } = await supabase
+    .from("games")
+    .delete()
+    .eq("id", game.id);
+
+    if (deleteErr) {
+      console.error("Fehler beim Löschen des Spiels:", deleteErr);
+    }
   }
 
   // Setze den aktuellen Spieler wieder in_queue
@@ -350,30 +373,31 @@ async function onP2Click(game, currentUserId, p2) {
     if (updateWinnerError) {
       console.log("Fehler beim Winner Update.");
     }
-  }
-
-  if (winner && winner === p2) { 
-
-    const { error: updateError } = await supabase
-    .rpc("increment_user_points", { uid: p2, delta: 1 });
-
-    if (updateError) {
-      alert("Gewinner konnte nicht registriert werden!");
-      return;
-    }
-    console.log("Gewinner eingetragen");
   } else {
-    alert("Na toll, weil ihr euch uneinig wart, kriegt keiner einen Punkt.");
+    if (winner && winner === p2) { 
+
+      const { error: updateError } = await supabase
+      .rpc("increment_user_points", { uid: p2, delta: 1 });
+
+      if (updateError) {
+        alert("Gewinner konnte nicht registriert werden!");
+        return;
+      }
+      console.log("Gewinner eingetragen");
+    } else {
+      alert("Na toll, weil ihr euch uneinig wart, kriegt keiner einen Punkt.");
+    }
+
+    const { error: deleteErr } = await supabase
+      .from("games")
+      .delete()
+      .eq("id", game.id);
+
+    if (deleteErr) {
+      console.error("Fehler beim Löschen des Spiels:", deleteErr);
+    }
   }
 
-  const { error: deleteErr } = await supabase
-  .from("games")
-  .delete()
-  .eq("id", game.id);
-
-  if (deleteErr) {
-    console.error("Fehler beim Löschen des Spiels:", deleteErr);
-  }
 
   const { error: resetErr } = await supabase
     .from("users")
@@ -429,6 +453,10 @@ async function handleAuthState(session) {
     const logoutBtn = document.getElementById("logout-btn");
     if (logoutBtn?.classList.contains("hidden")) logoutBtn?.classList.remove("hidden");
     // Lösche den ganzen Login Kram aus der View
+    const loginText = document.getElementById('login-text');
+    if (!loginText?.classList.contains("hidden")) {
+      loginText.classList.add("hidden");
+    }
     const loginTab = document.getElementById('loginTab');
     if (loginTab?.classList.contains("active")) {
       loginTab.classList.remove("active");
@@ -530,7 +558,43 @@ async function handleAuthState(session) {
         { event: "*", schema: "public", table: "games" },
         async (payload) => {
           console.log("Subscribe zum Games Table wurde aufgerufen ...");
-          if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE") {
+          if (payload.eventType !== "INSERT" && payload.eventType !== "UPDATE" && payload.eventType === "DELETE") {
+            if (hasEnteredGameView) {
+              const { data: userStatus, error: statusError} = await supabase
+                .from("users")
+                .select("id, status")
+                .eq("id", session.user.id)
+                .single();
+              
+              if (userStatus === "paired") {
+                // Eigenes Spiel holen
+                console.log("User hat schon ein Match ...");
+                const { data: mygame, error: gameError } = await supabase
+                    .from("games")
+                    .select("*")
+                    .or(`player1.eq.${session.user.id},player2.eq.${session.user.id}`)
+                    .maybeSingle();
+                
+                // Mein GameView löschen, falls mein Spiel entfernt wurde
+                if (!mygame || gameError) {
+                  console.log("Kein Spiel gefunden.");
+        
+                  const { error: resetErr } = await supabase
+                  .from("users")
+                  .update({ status: "in_queue" })
+                  .eq("id", session.user.id);
+        
+                  if (resetErr) {
+                    console.error("Fehler beim Zurücksetzen des Status:", resetErr);
+                  }
+                  console.log("Wieder auf in_queue gesetzt.")
+
+                  deleteGameView();
+                } else {
+                  console.log("Delete eines Games stattgefunden, aber wohl nicht das eigene Spiel.");
+                }
+              }
+            }
             return;
           }
   
