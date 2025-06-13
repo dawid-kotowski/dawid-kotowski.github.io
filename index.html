@@ -2,48 +2,64 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Login</title>
   <link rel="icon" type="image/x-icon" href="/assets/favicon-ClGGMB7h.ico" />
-  <script type="module" crossorigin src="/assets/index-BLeyI4C-.js"></script>
-  <link rel="stylesheet" crossorigin href="/assets/index-v-qC563h.css">
+  <script type="module" crossorigin src="/assets/index-DXWwW4Ak.js"></script>
+  <link rel="stylesheet" crossorigin href="/assets/index-BxL46mAC.css">
 </head>
 <body>
   <div id="app">
     <div id="lobby">
-      <div class="logout-section">
-        <button id="logout-btn">Ausloggen</button>
-      </div>
-      <h1>Willkommen zur Lobby</h1>
-      <p>Warte, bis ein Spiel startet...</p>
-      <div class="tab-container">
-        <div class="tab active" id="loginTab">Login</div>
-        <div class="tab" id="registerTab">Registrierung</div>
-      </div>
-
-      <div class="login-section">
-        <div id="loginForm" class="form-container active">
-          <form>
-            <label for="loginEmail">Email:</label>
-            <input type="email" id="loginEmail" required>
-            <label for="loginPassword">Passwort:</label>
-            <input type="password" id="loginPassword" required>
-            <button type="button" id="login-btn">Einloggen</button>
-          </form>
+      <div class="lobby-content">
+        <div class="rules-board">
+          <h3>Spielregeln</h3>
+          <ul>
+            <li>Regel 1: Jeder spielt fair.</li>
+            <li>Regel 2: Keine Betrugsversuche.</li>
+            <li>Regel 3: Wer zuerst X Punkte hat, gewinnt.</li>
+            <!-- …etc.… -->
+          </ul>
         </div>
+        <div class="logout-section">
+          <button id="logout-btn">Ausloggen</button>
+        </div>
+          <div class="lobby-main">
+          <h1>Willkommen zur Lobby</h1>
+          <p>Warte, bis ein Spiel startet...</p>
+          <div class="tab-container">
+            <div class="tab active" id="loginTab">Login</div>
+            <div class="tab" id="registerTab">Registrierung</div>
+          </div>
 
-        <div id="registerForm" class="form-container">
-          <form>
-            <label for="regUsername">Benutzername:</label>
-            <input type="text" id="regUsername" required>
-            <label for="regEmail">E-Mail:</label>
-            <input type="email" id="regEmail" required>
-            <label for="regPassword">Passwort(mindestens 6 Zeichen):</label>
-            <input type="password" id="regPassword" required>
-            <button type="button" id="register-btn">Registrieren</button>
-          </form>
+          <div class="login-section">
+            <div id="loginForm" class="form-container active">
+              <form>
+                <label for="loginEmail">Email:</label>
+                <input type="email" id="loginEmail" required>
+                <label for="loginPassword">Passwort:</label>
+                <input type="password" id="loginPassword" required>
+                <button type="button" id="login-btn">Einloggen</button>
+              </form>
+            </div>
+
+            <div id="registerForm" class="form-container">
+              <form>
+                <label for="regUsername">Benutzername:</label>
+                <input type="text" id="regUsername" required>
+                <label for="regEmail">E-Mail:</label>
+                <input type="email" id="regEmail" required>
+                <label for="regPassword">Passwort(mindestens 6 Zeichen):</label>
+                <input type="password" id="regPassword" required>
+                <button type="button" id="register-btn">Registrieren</button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
-      <div id="status">Nicht angemeldet</div>
+    </div>
+
+    <div id="status">Nicht angemeldet</div>
 
       <div id="adminPanel" class="hidden">
         <h2>Admin-Bereich</h2>
@@ -68,8 +84,6 @@
           <tbody></tbody>
         </table>
       </div>
-    </div>
-
 
     <div id="gameView">
       <h2 id="gamePrompt">Wer von euch hat gewonnen?</h2>
